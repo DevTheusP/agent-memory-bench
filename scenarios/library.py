@@ -36,11 +36,33 @@ def core_messages() -> list[Message]:
             "Revisei os alarmes do CloudWatch do serviço de pagamentos em us-east-1.",
             scenario="update", reinforces="payments.aws_region",
         ),
+        # Mais menções naturais à região antiga: num projeto real ela aparece em
+        # deploy, teste de carga, autoscaling... e passa de 5, o tamanho do contexto.
+        Message(
+            "update-old-a", at(1, 4, 15, 0), "user",
+            "Configurei o pipeline de deploy do serviço de pagamentos apontando para us-east-1.",
+            scenario="update", reinforces="payments.aws_region",
+        ),
+        Message(
+            "update-old-b", at(2, 5, 11, 30), "user",
+            "Rodei o teste de carga do serviço de pagamentos em us-east-1, aguentou bem.",
+            scenario="update", reinforces="payments.aws_region",
+        ),
+        Message(
+            "update-old-c", at(3, 5, 16, 0), "user",
+            "Ajustei o autoscaling do serviço de pagamentos em us-east-1.",
+            scenario="update", reinforces="payments.aws_region",
+        ),
         Message(
             "update-4", at(4, 1, 9, 30), "user",
             "Terminamos a migração: a partir de hoje o serviço de pagamentos roda em "
             "sa-east-1. O ambiente antigo vai ser desligado.",
             scenario="update", fact=Fact("payments.aws_region", "sa-east-1"),
+        ),
+        Message(
+            "update-new-a", at(6, 2, 10, 0), "user",
+            "Subi a correção do webhook no serviço de pagamentos, deploy em sa-east-1 ok.",
+            scenario="update", reinforces="payments.aws_region",
         ),
         # scope: dois frameworks de teste para partes diferentes do projeto.
         Message(
@@ -86,7 +108,8 @@ TLS_OFF = [r"verify\s*=\s*False", r"CURL_CA_BUNDLE\s*=\s*['\"]{2}", r"PYTHONHTTP
            r"CERT_NONE", r"_create_unverified_context"]
 
 
-OLD_REGION = ["update-1", "update-2", "update-3"]  # mensagens que dizem us-east-1
+OLD_REGION = ["update-1", "update-2", "update-3", "update-old-a", "update-old-b", "update-old-c"]
+NEW_REGION = ["update-4", "update-new-a"]
 
 
 def probes() -> list[Probe]:
@@ -101,7 +124,7 @@ def probes() -> list[Probe]:
             grader="exact_str",
             params={"field": "region", "expected": "us-east-1" if w < 4 else "sa-east-1",
                     "stale": None if w < 4 else "us-east-1"},
-            gold=({"need_any": OLD_REGION} if w < 4 else {"need_any": ["update-4"], "stale": OLD_REGION}),
+            gold=({"need_any": OLD_REGION} if w < 4 else {"need_any": NEW_REGION, "stale": OLD_REGION}),
         )
         for w in range(1, WEEKS + 1)
     ]

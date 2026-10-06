@@ -103,3 +103,13 @@ def test_measuring_retrieval_does_not_count_as_use():
     for p in policies:
         run_version(p, tl, io.StringIO())
         assert all(r.use_count == 0 and r.last_used_at is None for r in p.store.all())
+
+
+def test_stale_share_counts_old_region_memories_after_migration():
+    tl = build_timeline()
+    naive = make_policies(HashEmbedder(), CachedExtractor(LLMExtractor(FakeLLM())))[0]
+    rows = {r.probe_id: r for r in run_version(naive, tl, io.StringIO())}
+    assert rows["update-w2"].stale_share is None  # antes da migração não há valor obsoleto
+    share = rows["update-w6"].stale_share
+    assert share is not None and 0 < share <= 1
+    assert rows["scope-w5"].stale_share is None

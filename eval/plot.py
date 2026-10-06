@@ -22,10 +22,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+from scenarios.library import core_messages  # noqa: E402
 from scenarios.model import WEEKS  # noqa: E402
 
 RESULTS = Path(__file__).resolve().parent.parent / "results"
-CORE_MESSAGES = 8
+CORE_MESSAGES = len(core_messages())
 
 BASELINE = ("v0_no_memory", "0. Sem memória (referência)", "X")
 VERSIONS = {  # ordem fixa: a cor segue a versão, nunca a posição no ranking

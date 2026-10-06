@@ -1,4 +1,5 @@
 from scenarios.build import build_timeline
+from scenarios.library import core_messages
 from scenarios.model import Message, Probe
 
 
@@ -18,7 +19,7 @@ def test_default_size_is_about_30_messages():
 
 
 def test_noise_scales():
-    assert len(build_timeline(noise_per_week=20).messages) == 8 + 20 * 8
+    assert len(build_timeline(noise_per_week=20).messages) == len(core_messages()) + 20 * 8
 
 
 def test_rare_fact_is_said_exactly_once():

@@ -123,6 +123,7 @@ class Row:
     # camada 1: recuperação (sempre medida)
     retrieved_ok: bool
     stale_only: bool | None
+    stale_share: float | None  # fração das memórias recuperadas que vêm de origem obsoleta
     injected_in_context: bool | None
     # camada 2: resposta do modelo (só com --answers)
     passed: bool | None
@@ -148,6 +149,8 @@ def run_version(policy: MemoryPolicy, tl: Timeline, trace: IO[str], llm: LLM | N
         lines = [f"{i}. {policy.render_line(h, now)[2:]}" for i, h in enumerate(hits, 1)]
         origins = {h.record.origin for h in hits if h.record.origin}
         rg = grade_retrieval(ev, origins)
+        stale = set(ev.gold.get("stale", []))
+        stale_share = (sum(h.record.origin in stale for h in hits) / len(hits)) if stale and hits else None
 
         answer: dict = {}
         g = None
@@ -168,7 +171,7 @@ def run_version(policy: MemoryPolicy, tl: Timeline, trace: IO[str], llm: LLM | N
 
         rows.append(Row(
             tl.gap_days, tl.noise_per_week, tl.seed, policy.name, ev.id, ev.scenario, ev.week,
-            rg.passed, rg.stale_only, rg.injected,
+            rg.passed, rg.stale_only, stale_share, rg.injected,
             g.passed if g else None, g.used_stale if g else None, g.followed_injection if g else None,
             estimate_tokens("\n".join(lines)), len(hits), ";".join(sorted(origins)),
             json.dumps(answer, ensure_ascii=False) if answer else "", g.detail if g else "",
@@ -200,6 +203,8 @@ def summarize(rows: list[Row]) -> list[dict]:
         for s in SCENARIOS:
             line[f"ret_{s}"] = _rate([r.retrieved_ok for r in rs if r.scenario == s])
         line["stale_only_rate"] = _rate([r.stale_only for r in rs])
+        shares = [r.stale_share for r in rs if r.stale_share is not None]
+        line["stale_share"] = mean(shares) if shares else None
         line["injected_rate"] = _rate([r.injected_in_context for r in rs])
         line["answer"] = _rate([r.passed for r in rs])
         for s in SCENARIOS:
@@ -217,7 +222,7 @@ def _write_csv(path: Path, dicts: list[dict]) -> None:
 
 
 def print_summary(summary: list[dict]) -> None:
-    pct = ["retrieval", *(f"ret_{s}" for s in SCENARIOS), "stale_only_rate", "injected_rate"]
+    pct = ["retrieval", *(f"ret_{s}" for s in SCENARIOS), "stale_only_rate", "stale_share", "injected_rate"]
     if any(line["answer"] is not None for line in summary):
         pct += ["answer", *(f"ans_{s}" for s in SCENARIOS)]
     cols = ["gap_days", "noise_per_week", "version", *pct, "memory_tokens"]
@@ -284,6 +289,7 @@ def main() -> None:
 
 
 _FLOAT = {"gap_days"}
+_OPT_FLOAT = {"stale_share"}
 _INT = {"noise_per_week", "seed", "week", "memory_tokens", "n_memories"}
 _BOOL = {"retrieved_ok"}
 _OPT_BOOL = {"stale_only", "injected_in_context", "passed", "used_stale", "followed_injection"}
@@ -293,6 +299,8 @@ def read_rows(path: Path) -> list[Row]:
     def conv(k: str, v: str):
         if k in _FLOAT:
             return float(v)
+        if k in _OPT_FLOAT:
+            return None if v == "" else float(v)
         if k in _INT:
             return int(v)
         if k in _BOOL:
