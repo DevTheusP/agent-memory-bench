@@ -297,4 +297,4 @@ E o "vitest no frontend" nunca virou fato em nenhuma execução. O cenário de e
 
 É um cenário sintético, uma conversa de 8 semanas, 5 execuções por ponto na recuperação e 3 na resposta, um modelo de 7B extraindo e respondendo, e 5 memórias por pergunta. Os números servem pra comparar as políticas entre si, não pra prever como um produto real vai se comportar.
 
-O código, os cenários e os gráficos tão no repositório: <!-- PENDENTE link -->.
+O código, os cenários e os gráficos tão no repositório: [DevTheusP/agent-memory-bench](https://github.com/DevTheusP/agent-memory-bench).
