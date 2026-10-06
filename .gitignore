@@ -1,0 +1,6 @@
+__pycache__/
+.venv/
+.pytest_cache/
+results/*
+!results/.gitkeep
+scenarios/timeline.json
