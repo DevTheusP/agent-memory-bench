@@ -10,6 +10,7 @@ para um post no dev.to. Roda 100% local, com Ollama.
 - `memory/` tem as 4 versões de memória com interface comum (`write`, `retrieve`, `mark_used`, `sweep`)
 - `eval/` tem o runner (`run.py`), que aplica a prova e calcula as métricas, e os gráficos (`plot.py`)
 - `results/` guarda as saídas (`runs.csv`, `summary.csv`, `trace.jsonl`, PNGs); fica fora do git
+- `post/` tem o texto do post, os gráficos usados nele e, em `post/dados/`, o resumo das duas camadas da rodada publicada
 
 ## Duas camadas de avaliação
 

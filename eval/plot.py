@@ -33,7 +33,7 @@ VERSIONS = {  # ordem fixa: a cor segue a versão, nunca a posição no ranking
     "v1_naive": ("1. Ingênua", "o"),
     "v2_keyed": ("2. Chave de sujeito", "s"),
     "v3_decay_rank": ("3. Decaimento no ranking", "^"),
-    "v4_decay_tier": ("4. Decaimento no rótulo", "D"),
+    "v4_decay_tier": ("4. Decaimento no tier", "D"),
 }
 SCENARIOS = {
     "update": "Mudança de valor",
@@ -134,7 +134,8 @@ def _legend(fig, theme: dict, with_baseline: bool, y: float = 0.905) -> None:
         t.set_color(theme["text"])
 
 
-def plot_overall(acc: dict, seeds: int, noises: list[int], theme_name: str, out: Path, title: str) -> None:
+def plot_overall(acc: dict, seeds: int, noises: list[int], theme_name: str, out: Path, title: str,
+                 subtitle: str | None = None) -> None:
     theme = THEMES[theme_name]
     fig, ax = plt.subplots(figsize=(10, 5.6), dpi=200)
     fig.patch.set_facecolor(theme["surface"])
@@ -144,7 +145,7 @@ def plot_overall(acc: dict, seeds: int, noises: list[int], theme_name: str, out:
     ax.set_xlabel("Mensagens no histórico do agente", color=theme["muted"], fontsize=10, labelpad=10)
     fig.text(0.08, 0.95, title,
              color=theme["text"], fontsize=15, fontweight="bold")
-    fig.text(0.08, 0.915, f"Média de {seeds} execuções, 28 perguntas cada, conforme o histórico cresce; 5 memórias por pergunta",
+    fig.text(0.08, 0.915, subtitle or f"Média de {seeds} execuções, 28 perguntas cada, conforme o histórico cresce; 5 memórias por pergunta",
              color=theme["muted"], fontsize=10)
     _legend(fig, theme, any(k[1] == BASELINE[0] for k in acc))
     fig.savefig(out, facecolor=theme["surface"])
@@ -199,6 +200,16 @@ def plot_time(acc: dict, seeds: int, scenario: str, noises: list[int], theme_nam
     plt.close(fig)
 
 
+def load_stale_share(path: Path) -> dict:
+    """acc[(None, version, noise)] = % médio do contexto com valor obsoleto, sem pausa."""
+    buckets: dict[tuple, list[float]] = defaultdict(list)
+    with path.open() as f:
+        for r in csv.DictReader(f):
+            if r["stale_share"] and float(r.get("gap_days") or 0) == 0:
+                buckets[(None, r["version"], int(r["noise_per_week"]))].append(float(r["stale_share"]))
+    return {k: 100 * mean(v) for k, v in buckets.items()}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--metric", choices=list(METRICS), default="retrieval")
@@ -214,6 +225,12 @@ def main() -> None:
                       RESULTS / f"{args.metric}_regra_rara_tempo_{theme}.png",
                       "Regra dita uma vez, conforme ela envelhece")
         plot_overall(acc, seeds, noises, theme, RESULTS / f"{args.metric}_geral_{theme}.png", title)
+        if args.metric == "retrieval":
+            stale = load_stale_share(RESULTS / "runs.csv")
+            plot_overall(stale, seeds, sorted({k[2] for k in stale}), theme,
+                         RESULTS / f"valor_obsoleto_{theme}.png",
+                         "Quanto do contexto ainda fala a região antiga",
+                         f"Depois da migração; quanto menor, melhor. Média de {seeds} execuções; 5 memórias por pergunta")
         plot_by_scenario(acc, seeds, noises, theme, RESULTS / f"{args.metric}_por_cenario_{theme}.png",
                          title_by_scenario)
     print(f"gráficos salvos em {RESULTS}")
