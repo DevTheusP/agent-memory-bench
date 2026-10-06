@@ -1,8 +1,9 @@
 # agent-memory-bench
 
-Experimento que compara 4 políticas de memória para um agente de IA de longa
-duração (um assistente de código que acompanha o mesmo projeto por semanas),
-para um post no dev.to. Roda 100% local, com Ollama.
+Experimento que compara 4 políticas de memória (mais uma referência sem memória)
+para um agente de IA de longa duração: um assistente de código que acompanha o
+mesmo projeto por semanas. Feito para um post no dev.to, que está em
+[`post/rascunho.md`](post/rascunho.md). Roda 100% local, com Ollama.
 
 ## Estrutura
 
@@ -17,7 +18,7 @@ para um post no dev.to. Roda 100% local, com Ollama.
 1. **Recuperação** (principal): a memória certa chegou às 5 memórias que vão para o modelo?
    Cada memória carrega o id opaco da mensagem de origem, e cada pergunta declara no
    `gold` quais origens precisam (ou não podem) chegar. Não usa o LLM para responder,
-   então é determinística e roda em cerca de 1 minuto.
+   só para extrair fatos (com cache), então é rápida.
 2. **Resposta** (`--answers`): o modelo respondeu certo? Depende de o modelo obedecer à
    memória; na calibração, o `qwen2.5:7b` ignorou a regra mesmo com ela no contexto.
 
@@ -47,21 +48,63 @@ memória e nunca escrevem nela. O agente responde em JSON (`response_schema`) e
 | `v3_decay_rank` | v2 + score `0.55*sim + 0.20*recência + 0.20*trust + 0.05*uso` |
 | `v4_decay_tier` | v2 + idade só no rótulo e no tier hot/cold; ranking só por similaridade |
 
-## Uso
+## Como rodar
 
-Requer o Ollama rodando com os modelos `qwen2.5:7b` e `bge-m3`:
+### Pré-requisitos
+
+- [uv](https://docs.astral.sh/uv/getting-started/installation/): instala o Python certo (3.12+) e as dependências sozinho
+- [Ollama](https://ollama.com/download), com os dois modelos baixados (cerca de 6 GB no total):
 
 ```bash
-ollama pull qwen2.5:7b && ollama pull bge-m3
+ollama pull qwen2.5:7b
+ollama pull bge-m3
+```
 
-# camada 1: volume de histórico e idade da regra rara variando (cerca de 1 min)
+- Hardware: a rodada publicada usou uma GPU de 8 GB. Em CPU funciona, só que bem mais devagar.
+
+### 1. Testes (não precisam de Ollama)
+
+```bash
+uv run pytest
+```
+
+### 2. Camada 1: recuperação
+
+Deixe o Ollama rodando num terminal:
+
+```bash
+ollama serve
+```
+
+Em outro terminal, rode a mesma configuração do post (5 seeds, 5 volumes de histórico, 5 idades da regra rara):
+
+```bash
 uv run python -m eval.run --seeds 1 2 3 4 5 --noise-levels 3 10 25 50 100 --gap-days 0 90 180 365 730
 uv run python -m eval.plot
+```
 
-# camada 2: respostas do modelo (horas de GPU)
-uv run python -m eval.run --seeds 1 2 3 --noise-levels 3 10 25 50 --answers
-uv run python -m eval.plot --metric answer
+Na primeira vez leva cerca de 2 minutos numa GPU de 8 GB, porque o LLM precisa extrair os fatos de cada mensagem. A extração fica em cache em `results/extract_cache_*.json`, e as rodadas seguintes são mais rápidas. Os resultados e os gráficos vão para `results/`.
 
-uv run python -m scenarios.build   # só gera scenarios/timeline.json
-uv run pytest                      # testes offline, sem LLM
+### 3. Camada 2: resposta do modelo (opcional, mais de 1 hora)
+
+Use outra pasta de saída para não sobrescrever a camada 1:
+
+```bash
+mkdir -p results/camada2
+cp results/extract_cache_*.json results/camada2/   # reaproveita a extração da camada 1
+uv run python -m eval.run --seeds 1 2 3 --noise-levels 3 50 --gap-days 0 365 --answers --out results/camada2
+uv run python -m eval.plot --metric answer --dir results/camada2
+```
+
+Se a rodada cair no meio, repita o mesmo comando com `--append`: ele pula o que já foi gravado.
+
+### Sobre reproduzir os números
+
+O ruído de cada seed é fixo, então a conversa simulada é sempre a mesma. A extração de fatos depende do LLM (temperatura 0), e outra GPU ou outra versão do Ollama pode extrair um pouco diferente. Num clone limpo, na mesma máquina, a camada 1 reproduziu 499 dos 500 valores publicados em `post/dados/camada1_recuperacao.csv`; o que mudou variou menos de 1 ponto percentual.
+
+### Outros comandos
+
+```bash
+uv run python -m scenarios.build                     # gera scenarios/timeline.json para ver a conversa
+uv run python -m eval.run --help                     # todas as opções do runner
 ```

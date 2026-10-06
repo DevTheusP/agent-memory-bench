@@ -213,27 +213,32 @@ def load_stale_share(path: Path) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--metric", choices=list(METRICS), default="retrieval")
+    ap.add_argument("--dir", type=Path, default=RESULTS,
+                    help="pasta com o runs.csv; os gráficos são salvos nela")
     args = ap.parse_args()
+    out = args.dir
+    if not (out / "runs.csv").exists():
+        raise SystemExit(f"{out / 'runs.csv'} não existe: rode `uv run python -m eval.run ...` antes")
     column, title, title_by_scenario = METRICS[args.metric]
-    full, seeds = load(RESULTS / "runs.csv", column)
+    full, seeds = load(out / "runs.csv", column)
     acc = at_scale(full, 0.0)
     noises = sorted({k[2] for k in acc})
     scales = sorted({k[3] for k in full})
     for theme in THEMES:
         if len(scales) > 1:
             plot_time(full, seeds, "rare_fact", [n for n in (10, 50, 100) if n in noises], theme,
-                      RESULTS / f"{args.metric}_regra_rara_tempo_{theme}.png",
+                      out / f"{args.metric}_regra_rara_tempo_{theme}.png",
                       "Regra dita uma vez, conforme ela envelhece")
-        plot_overall(acc, seeds, noises, theme, RESULTS / f"{args.metric}_geral_{theme}.png", title)
+        plot_overall(acc, seeds, noises, theme, out / f"{args.metric}_geral_{theme}.png", title)
         if args.metric == "retrieval":
-            stale = load_stale_share(RESULTS / "runs.csv")
+            stale = load_stale_share(out / "runs.csv")
             plot_overall(stale, seeds, sorted({k[2] for k in stale}), theme,
-                         RESULTS / f"valor_obsoleto_{theme}.png",
+                         out / f"valor_obsoleto_{theme}.png",
                          "Quanto do contexto ainda fala a região antiga",
                          f"Depois da migração; quanto menor, melhor. Média de {seeds} execuções; 5 memórias por pergunta")
-        plot_by_scenario(acc, seeds, noises, theme, RESULTS / f"{args.metric}_por_cenario_{theme}.png",
+        plot_by_scenario(acc, seeds, noises, theme, out / f"{args.metric}_por_cenario_{theme}.png",
                          title_by_scenario)
-    print(f"gráficos salvos em {RESULTS}")
+    print(f"gráficos salvos em {out}")
 
 
 if __name__ == "__main__":
