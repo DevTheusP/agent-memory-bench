@@ -3,6 +3,8 @@ name = "agent-memory-bench"
 version = "0.1.0"
 description = "Benchmark de políticas de memória para um agente de IA de longa duração"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "matplotlib>=3.11.2",
     "sqlite-vec>=0.1.9",

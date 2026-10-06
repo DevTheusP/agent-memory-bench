@@ -108,3 +108,7 @@ O ruído de cada seed é fixo, então a conversa simulada é sempre a mesma. A e
 uv run python -m scenarios.build                     # gera scenarios/timeline.json para ver a conversa
 uv run python -m eval.run --help                     # todas as opções do runner
 ```
+
+## Licença
+
+[MIT](LICENSE).
