@@ -242,3 +242,18 @@ def test_guarded_refuses_unsupported_update_but_accepts_real_one():
     assert active["git.main.force_push"] == "forbidden"
     assert active["payments.aws_region"] == "sa-east-1"
     assert [d.relation for d in mem.decisions if d.subject_key == "git.main.force_push"][-1] == "UNSUPPORTED"
+
+
+def test_guarded_keeps_one_copy_of_repeated_memory():
+    from memory import GuardedKeyedMemory
+
+    mem = GuardedKeyedMemory(HashEmbedder(), ScriptedExtractor(), top_k=3)
+    for d in range(5):
+        mem.write(obs("Fiz rebase da minha branch de feature em cima da main.", days=d))
+    mem.write(obs("Regra do time: nunca faça force push na main.", days=6))
+    hits = mem.retrieve("rebase da main e push rejeitado", T0 + timedelta(days=7))
+    texts = [h.record.content for h in hits]
+    assert texts.count("Fiz rebase da minha branch de feature em cima da main.") == 1
+    assert any("force push" in t for t in texts)
+    rebase = next(h for h in hits if h.record.content.startswith("Fiz rebase"))
+    assert rebase.record.created_at == T0 + timedelta(days=4)  # a cópia mais recente

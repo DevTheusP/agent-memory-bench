@@ -1,4 +1,4 @@
-"""Versão 5: chave de sujeito com substituição protegida.
+"""Versão 5: chave de sujeito com substituição protegida e sem memórias repetidas.
 
 Igual à versão 2, com uma diferença na escrita: um fato só substitui outro
 ativo, de valor diferente, se a mensagem de origem falar do mesmo assunto do
@@ -17,11 +17,21 @@ da região 0,72 e 0,75. SUPPORT_MIN = 0,55 fica entre os dois grupos.
 
 A substituição recusada não apaga nada: o episódio continua guardado e a
 decisão fica registrada como UNSUPPORTED.
+
+Na leitura, memórias com o mesmo texto ocupam um lugar só (fica a mais recente).
+Por quê: no cenário da regra rara, o ruído "Fiz rebase da minha branch de
+feature em cima da main." se repete toda semana e, com ruído alto, ocupava as 5
+vagas sozinho. Na rodada publicada a regra só vencia porque o 7B escreveu um
+statement quebrado ("A never force push na main deve ser seguida.") que, por
+acaso, ficou mais parecido com a pergunta (0,657) que o ruído (0,635); qualquer
+redação correta da regra ficava abaixo (0,54 a 0,62).
 """
 
 from __future__ import annotations
 
-from .base import Observation
+from datetime import datetime
+
+from .base import Hit, Observation
 from .extract import ExtractedFact
 from .keyed import KeyedMemory
 
@@ -47,3 +57,17 @@ class GuardedKeyedMemory(KeyedMemory):
                 self._log(obs, fact, "UNSUPPORTED", "old", current)
                 return
         super()._resolve(fact, obs, trust)
+
+    def _rank(self, query_embedding: list[float], now: datetime) -> list[Hit]:
+        seen: set[str] = set()
+        out = []
+        ranked = super()._rank(query_embedding, now)
+        # empate de score entre cópias: a mais recente primeiro
+        ranked.sort(key=lambda h: (-h.score, -h.record.created_at.timestamp()))
+        for h in ranked:
+            key = " ".join(h.record.content.lower().split())
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(h)
+        return out

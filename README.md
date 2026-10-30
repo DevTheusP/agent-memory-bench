@@ -1,6 +1,6 @@
 # agent-memory-bench
 
-Experimento que compara 4 políticas de memória (mais uma referência sem memória)
+Experimento que compara 5 políticas de memória (mais uma referência sem memória)
 para um agente de IA de longa duração: um assistente de código que acompanha o
 mesmo projeto por semanas. Feito para um post no dev.to, que está em
 [`post/rascunho.md`](post/rascunho.md). Roda 100% local, com Ollama.
@@ -8,7 +8,7 @@ mesmo projeto por semanas. Feito para um post no dev.to, que está em
 ## Estrutura
 
 - `scenarios/` define a conversa simulada (8 semanas), os 4 cenários e as perguntas de avaliação
-- `memory/` tem as 4 versões de memória com interface comum (`write`, `retrieve`, `mark_used`, `sweep`)
+- `memory/` tem as 5 versões de memória com interface comum (`write`, `retrieve`, `mark_used`, `sweep`)
 - `eval/` tem o runner (`run.py`), que aplica a prova e calcula as métricas, e os gráficos (`plot.py`)
 - `results/` guarda as saídas (`runs.csv`, `summary.csv`, `trace.jsonl`, PNGs); fica fora do git
 - `post/` tem o texto do post, os gráficos usados nele e, em `post/dados/`, o resumo das duas camadas da rodada publicada
@@ -47,6 +47,27 @@ memória e nunca escrevem nela. O agente responde em JSON (`response_schema`) e
 | `v2_keyed` | LLM extrai fatos com `subject_key`; colisão de chave é resolvida na escrita (o antigo fica inativo, nunca apagado); fonte de baixa confiança fica em quarentena |
 | `v3_decay_rank` | v2 + score `0.55*sim + 0.20*recência + 0.20*trust + 0.05*uso` |
 | `v4_decay_tier` | v2 + idade só no rótulo e no tier hot/cold; ranking só por similaridade |
+| `v5_guarded` | v2 + substituição só quando a mensagem fala do mesmo assunto do fato antigo, e sem memórias repetidas na leitura (adicionada depois do post) |
+
+## Depois do post: a v5 e o que os 98% escondiam
+
+Ao trocar o extrator (projeto [fact-extractor-distill](https://github.com/DevTheusP/fact-extractor-distill)),
+a v2 caiu de 98% para 82–83%. Dois mecanismos, detalhados no
+[diagnóstico](https://github.com/DevTheusP/fact-extractor-distill/blob/main/docs/diagnostico.md):
+
+1. o extrator inventou `coding_rules.force_push = false` numa mensagem sobre outra coisa, e a v2
+   desativou a regra por ser a mesma chave;
+2. com ruído alto, um episódio repetido toda semana ocupava as 5 vagas. Na rodada publicada, a
+   regra só vencia porque o statement do 7B ("A never force push na main deve ser seguida.")
+   ficou, por acaso, mais parecido com a pergunta do que qualquer redação correta.
+
+| extrator | v2_keyed | v5_guarded |
+|---|---|---|
+| qwen2.5:7b (rodada publicada) | 98,0% | 99,6% |
+| Qwen2.5-0.5B destilado | 82,3% | 97,9% |
+
+Na métrica de recuperação, o ganho vem da deduplicação. A proteção na escrita tira o fato falso
+do contexto (de 275 para 0 em 875 perguntas sobre a regra), o que a métrica atual não mede.
 
 ## Como rodar
 
