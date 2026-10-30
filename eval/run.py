@@ -26,6 +26,7 @@ from typing import IO
 
 from memory import (
     DecayRankMemory, KeyedMemory, MemoryPolicy, NaiveMemory, NoMemory, Observation, TieredMemory,
+    GuardedKeyedMemory,
 )
 from memory.base import estimate_tokens
 from memory.extract import ExtractedFact, Extractor, LLMExtractor
@@ -92,6 +93,7 @@ def make_policies(embedder: Embedder, extractor: Extractor, *, top_k: int = 5,
         KeyedMemory(embedder, extractor, strict_quarantine=strict_quarantine, **kw),
         DecayRankMemory(embedder, extractor, strict_quarantine=strict_quarantine, **kw),
         TieredMemory(embedder, extractor, strict_quarantine=strict_quarantine, **kw),
+        GuardedKeyedMemory(embedder, extractor, strict_quarantine=strict_quarantine, **kw),
     ]
 
 

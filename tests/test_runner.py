@@ -34,12 +34,12 @@ def test_runner_end_to_end_with_fake_llm():
     for policy in make_policies(HashEmbedder(), extractor):
         rows += run_version(policy, tl, trace, llm)
 
-    assert len(rows) == 4 * len(tl.probes)
+    assert len(rows) == 5 * len(tl.probes)
     assert len(trace.getvalue().splitlines()) == len(rows)
     assert json.loads(trace.getvalue().splitlines()[0])["memories"]
 
     summary = {s["version"]: s for s in summarize(rows)}
-    assert set(summary) == {"v1_naive", "v2_keyed", "v3_decay_rank", "v4_decay_tier"}
+    assert set(summary) == {"v1_naive", "v2_keyed", "v3_decay_rank", "v4_decay_tier", "v5_guarded"}
     for s in summary.values():
         # sempre "sa-east-1": erra as semanas 1 a 3 do update e acerta o resto
         assert s["ans_update"] == 5 / 8

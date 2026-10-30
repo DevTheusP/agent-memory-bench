@@ -210,3 +210,35 @@ def test_origin_is_carried_to_episodes_and_facts():
     mem.write(Observation("O serviço de pagamentos roda em us-east-1.", "user", T0, origin="update-1"))
     assert {r.origin for r in mem.store.all()} == {"update-1"}
     assert len(mem.store.all()) == 2  # episódio + fato, os dois com a mesma origem
+
+
+# versão 5: substituição protegida
+
+class HallucinatingExtractor(ScriptedExtractor):
+    """Reproduz a falha do extrator destilado: a mensagem da migração também 'desliga' a regra."""
+
+    def extract(self, text, existing_keys):
+        out = super().extract(text, existing_keys)
+        if "sa-east-1" in text and "git.main.force_push" in existing_keys:
+            out.append(ExtractedFact("git.main.force_push", "allowed", "procedural", "Force push liberado."))
+        return out
+
+
+def test_keyed_lets_hallucinated_fact_disable_rule():
+    mem = KeyedMemory(HashEmbedder(), HallucinatingExtractor())
+    mem.write(obs("Regra do time: nunca faça force push na main."))
+    mem.write(obs("Terminamos a migração: o serviço de pagamentos roda em sa-east-1.", days=30))
+    assert "allowed" in {r.value for r in facts(mem) if r.subject_key == "git.main.force_push"}
+
+
+def test_guarded_refuses_unsupported_update_but_accepts_real_one():
+    from memory import GuardedKeyedMemory
+
+    mem = GuardedKeyedMemory(HashEmbedder(), HallucinatingExtractor())
+    mem.write(obs("Regra do time: nunca faça force push na main."))
+    mem.write(obs("O serviço de pagamentos roda em us-east-1.", days=1))
+    mem.write(obs("Terminamos a migração: o serviço de pagamentos roda em sa-east-1.", days=30))
+    active = {r.subject_key: r.value for r in facts(mem)}
+    assert active["git.main.force_push"] == "forbidden"
+    assert active["payments.aws_region"] == "sa-east-1"
+    assert [d.relation for d in mem.decisions if d.subject_key == "git.main.force_push"][-1] == "UNSUPPORTED"
